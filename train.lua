@@ -1,424 +1,183 @@
 --[[
 ═══════════════════════════════════════════════════════════
-    TRAIN TO FIGHT - STATS MULTIPLIER SCRIPT
-    Version: 2.0 (GitHub Compatible)
-    
-    CARA PAKAI:
-    1. Copy script ini
-    2. Upload ke GitHub (atau Pastebin)
-    3. Gunakan: loadstring(game:HttpGet("URL_KAMU"))()
-    
-    ATAU langsung execute di Delta!
+    TRAIN TO FIGHT - DIAGNOSTIC SCRIPT
+    Jalankan ini untuk cek struktur stats
 ═══════════════════════════════════════════════════════════
 ]]
 
-repeat wait() until game:IsLoaded()
-wait(1)
-
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
 local Player = Players.LocalPlayer
 
--- ═══════════════════════════════════════════════════════════
--- ⚙️ KONFIGURASI (EDIT DI SINI)
--- ═══════════════════════════════════════════════════════════
+print("\n" .. string.rep("=", 60))
+print("🔍 TRAIN TO FIGHT - DIAGNOSTIC MODE")
+print(string.rep("=", 60))
 
-getgenv().Config = getgenv().Config or {
-    -- MULTIPLIER STATS
-    ArmsMultiplier = 40,        -- Multiply Arms
-    BackMultiplier = 40,        -- Multiply Back
-    LegsMultiplier = 40,        -- Multiply Legs
-    AgilityMultiplier = 40,     -- Multiply Agility
-    
-    -- AUTO TRAINING
-    AutoTrain = false,           -- Auto training on/off
-    TrainDelay = 0.3,          -- Delay antar training (seconds)
-    TrainBodyParts = {         -- Body parts yang mau di-train
-        "Arms",
-        "Back", 
-        "Legs",
-        "Agility",
-    },
-    
-    -- CHARACTER BOOST
-    WalkSpeed = 300,            -- Default: 16
-    JumpPower = 100,            -- Default: 50
-    AutoApplySpeed = true,      -- Auto apply speed setiap spawn
-    
-    -- ANTI-AFK
-    AntiAFK = true,
-    
-    -- AUTO COLLECT (jika ada gems/coins)
-    AutoCollect = false,
-    
-    -- GUI SETTINGS
-    ShowGUI = true,
-    GUIPosition = UDim2.new(0.85, 0, 0.3, 0),
-}
-
--- ═══════════════════════════════════════════════════════════
--- 📡 NOTIFIKASI SISTEM
--- ═══════════════════════════════════════════════════════════
-
-local function Notify(title, text, duration)
-    pcall(function()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "🎮 " .. title,
-            Text = text,
-            Duration = duration or 3,
-            Icon = "rbxassetid://7733992358"
-        })
-    end)
-end
-
-Notify("Train to Fight", "Loading script...", 3)
-
--- ═══════════════════════════════════════════════════════════
--- 🔍 FIND REMOTES (AUTO DETECT)
--- ═══════════════════════════════════════════════════════════
-
-local TrainRemote = nil
-local StatsRemote = nil
-
-local function FindRemotes()
-    -- Cari di ReplicatedStorage
-    for _, descendant in pairs(ReplicatedStorage:GetDescendants()) do
-        if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-            local name = descendant.Name:lower()
-            
-            -- Detect Training Remote
-            if name:find("train") or name:find("workout") or name:find("exercise") then
-                TrainRemote = descendant
-                print("✓ Found Train Remote:", descendant:GetFullName())
-            end
-            
-            -- Detect Stats Remote
-            if name:find("stat") or name:find("point") or name:find("upgrade") then
-                StatsRemote = descendant
-                print("✓ Found Stats Remote:", descendant:GetFullName())
-            end
+-- Function untuk print tree structure
+local function printTree(instance, indent)
+    indent = indent or ""
+    for _, child in pairs(instance:GetChildren()) do
+        local info = child.Name .. " (" .. child.ClassName .. ")"
+        if child:IsA("ValueBase") then
+            info = info .. " = " .. tostring(child.Value)
         end
-    end
-    
-    if not TrainRemote then
-        warn("⚠️ Train Remote not found! Using fallback method...")
+        print(indent .. "├─ " .. info)
+        
+        if #child:GetChildren() > 0 and not child:IsA("ValueBase") then
+            printTree(child, indent .. "│  ")
+        end
     end
 end
 
-FindRemotes()
+wait(2) -- Wait for game to load
 
--- ═══════════════════════════════════════════════════════════
--- 💪 MULTIPLY STATS FUNCTION (FIXED)
--- ═══════════════════════════════════════════════════════════
+-- 1. CHECK PLAYER STRUCTURE
+print("\n📂 1. PLAYER STRUCTURE:")
+print("Player Name:", Player.Name)
+printTree(Player, "")
 
-local function MultiplyStats()
-    local success, errorMsg = pcall(function()
-        wait(0.5) -- Delay untuk ensure stats loaded
-        
-        -- Cari di berbagai lokasi possible
-        local statsFolder = Player:FindFirstChild("leaderstats") 
-            or Player:FindFirstChild("Stats")
-            or Player:FindFirstChild("PlayerStats")
-            or Player.Character and Player.Character:FindFirstChild("Stats")
-        
-        if not statsFolder then
-            -- Cari di PlayerGui atau PlayerScripts
-            for _, location in pairs({Player.PlayerGui, Player.PlayerScripts, Player.Backpack}) do
-                local found = location:FindFirstChild("leaderstats") or location:FindFirstChild("Stats")
-                if found then
-                    statsFolder = found
-                    break
-                end
-            end
-        end
-        
-        if not statsFolder then
-            Notify("Debug", "Searching in all Player children...", 2)
-            -- Debug: Print semua children
-            for _, child in pairs(Player:GetChildren()) do
-                print("Player child:", child.Name, child.ClassName)
-            end
-            
-            Notify("Error", "Stats folder not found!\nCheck console (F9) for debug info", 5)
-            return
-        end
-        
-        print("✓ Stats folder found:", statsFolder:GetFullName())
-        
-        local multiplied = {}
-        -- Stats yang ada di Train to Fight
-        local statsList = {
-            {name = "Arms", multiplier = getgenv().Config.ArmsMultiplier},
-            {name = "Back", multiplier = getgenv().Config.BackMultiplier},
-            {name = "Legs", multiplier = getgenv().Config.LegsMultiplier},
-            {name = "Agility", multiplier = getgenv().Config.AgilityMultiplier},
+-- 2. CHECK CHARACTER STRUCTURE
+print("\n👤 2. CHARACTER STRUCTURE:")
+if Player.Character then
+    printTree(Player.Character, "")
+else
+    print("❌ Character not found!")
+end
+
+-- 3. SPECIFIC LEADERSTATS CHECK
+print("\n📊 3. LEADERSTATS DETAILED CHECK:")
+local leaderstats = Player:FindFirstChild("leaderstats")
+if leaderstats then
+    print("✅ Leaderstats FOUND at:", leaderstats:GetFullName())
+    print("\nStats inside leaderstats:")
+    for _, stat in pairs(leaderstats:GetChildren()) do
+        local statInfo = {
+            Name = stat.Name,
+            ClassName = stat.ClassName,
+            Value = stat:IsA("ValueBase") and stat.Value or "N/A",
+            Parent = stat.Parent.Name,
+            FullPath = stat:GetFullName()
         }
-        
-        -- Loop through semua stats
-        for _, statInfo in ipairs(statsList) do
-            local stat = statsFolder:FindFirstChild(statInfo.name)
-            
-            if stat then
-                print("✓ Found stat:", statInfo.name, "Type:", stat.ClassName, "Value:", stat.Value)
-                
-                -- Check if it's a value object
-                if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                    local oldValue = tonumber(stat.Value) or 0
-                    
-                    if oldValue >= 0 then -- Allow 0 value
-                        local newValue = oldValue * statInfo.multiplier
-                        
-                        -- Update value
-                        stat.Value = newValue
-                        
-                        table.insert(multiplied, string.format("%s: %d → %d", 
-                            statInfo.name, oldValue, newValue))
-                        print(string.format("✓ Multiplied %s: %d → %d (x%d)", 
-                            statInfo.name, oldValue, newValue, statInfo.multiplier))
-                    end
-                elseif stat:IsA("StringValue") then
-                    -- Jika stats disimpan sebagai string
-                    local oldValue = tonumber(stat.Value) or 0
-                    if oldValue >= 0 then
-                        local newValue = oldValue * statInfo.multiplier
-                        stat.Value = tostring(newValue)
-                        table.insert(multiplied, string.format("%s: %d → %d", 
-                            statInfo.name, oldValue, newValue))
-                    end
-                end
-            else
-                print("⚠️ Stat not found:", statInfo.name)
-            end
-        end
-        
-        if #multiplied > 0 then
-            Notify("Stats Multiplied! ✓", table.concat(multiplied, "\n"), 6)
-        else
-            -- Debug info
-            Notify("Warning", "No valid stats found to multiply!", 4)
-            print("Available children in stats folder:")
-            for _, child in pairs(statsFolder:GetChildren()) do
-                print(" -", child.Name, child.ClassName, 
-                    child:IsA("ValueBase") and ("Value: " .. tostring(child.Value)) or "")
-            end
-        end
-    end)
+        print(string.format("  • %s", stat.Name))
+        print(string.format("    - Type: %s", statInfo.ClassName))
+        print(string.format("    - Current Value: %s", tostring(statInfo.Value)))
+        print(string.format("    - Full Path: %s", statInfo.FullPath))
+        print(string.format("    - Can be modified: %s", stat.Value ~= nil and "YES" or "NO"))
+    end
+else
+    print("❌ Leaderstats NOT FOUND!")
+    print("\nSearching in other locations...")
     
-    if not success then
-        Notify("Error", "Multiply failed!\n" .. tostring(errorMsg), 5)
-        warn("Multiply Stats Error:", errorMsg)
+    local possibleLocations = {
+        Player.PlayerGui,
+        Player.PlayerScripts,
+        Player.Backpack,
+        Player.Character
+    }
+    
+    for _, location in pairs(possibleLocations) do
+        if location then
+            local found = location:FindFirstChild("leaderstats") or location:FindFirstChild("Stats")
+            if found then
+                print("✅ Found stats at:", found:GetFullName())
+            end
+        end
     end
 end
 
--- ═══════════════════════════════════════════════════════════
--- 🏋️ AUTO TRAINING
--- ═══════════════════════════════════════════════════════════
-
-local AutoTrainRunning = false
-
-local function AutoTrain()
-    if AutoTrainRunning then return end
-    AutoTrainRunning = true
-    
-    spawn(function()
-        local index = 1
-        while getgenv().Config.AutoTrain and AutoTrainRunning do
-            pcall(function()
-                local bodyPart = getgenv().Config.TrainBodyParts[index]
-                
-                if TrainRemote then
-                    -- Method 1: FireServer dengan body part
-                    if TrainRemote:IsA("RemoteEvent") then
-                        TrainRemote:FireServer(bodyPart)
-                    else
-                        TrainRemote:InvokeServer(bodyPart)
-                    end
-                else
-                    -- Method 2: Fallback - cari semua remote yang possible
-                    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
-                        if remote:IsA("RemoteEvent") and remote.Name:lower():find("train") then
-                            remote:FireServer(bodyPart)
-                            break
-                        end
-                    end
-                end
-                
-                -- Rotasi body part
-                index = index % #getgenv().Config.TrainBodyParts + 1
-            end)
-            
-            wait(getgenv().Config.TrainDelay)
-        end
-        AutoTrainRunning = false
-    end)
-    
-    Notify("Auto Train", "Started!", 2)
-end
-
--- ═══════════════════════════════════════════════════════════
--- ⚡ CHARACTER BOOST
--- ═══════════════════════════════════════════════════════════
-
-local function ApplyCharacterBoost()
-    local char = Player.Character
-    if not char then return end
-    
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.WalkSpeed = getgenv().Config.WalkSpeed
-        humanoid.JumpPower = getgenv().Config.JumpPower
+-- 4. TEST MODIFICATION
+print("\n🔧 4. TESTING STAT MODIFICATION:")
+if leaderstats then
+    local testStat = leaderstats:FindFirstChild("Arms")
+    if testStat then
+        local originalValue = testStat.Value
+        print(string.format("Testing Arms modification..."))
+        print(string.format("  Original value: %s", tostring(originalValue)))
         
-        -- Keep speed constant
-        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if humanoid.WalkSpeed ~= getgenv().Config.WalkSpeed then
-                humanoid.WalkSpeed = getgenv().Config.WalkSpeed
-            end
+        wait(0.5)
+        
+        -- Try to modify
+        local success, err = pcall(function()
+            testStat.Value = originalValue + 100
         end)
         
-        Notify("Speed Boost", string.format("Speed: %d | Jump: %d", 
-            getgenv().Config.WalkSpeed, getgenv().Config.JumpPower), 2)
-    end
-end
-
--- ═══════════════════════════════════════════════════════════
--- 🛡️ ANTI-AFK
--- ═══════════════════════════════════════════════════════════
-
-if getgenv().Config.AntiAFK then
-    Player.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
-end
-
--- ═══════════════════════════════════════════════════════════
--- 🎨 SIMPLE GUI
--- ═══════════════════════════════════════════════════════════
-
-if getgenv().Config.ShowGUI then
-    local ScreenGui = Instance.new("ScreenGui")
-    local MainFrame = Instance.new("Frame")
-    local UICorner = Instance.new("UICorner")
-    local Title = Instance.new("TextLabel")
-    local Container = Instance.new("Frame")
-    local UIListLayout = Instance.new("UIListLayout")
-    
-    ScreenGui.Name = "TrainToFightGUI"
-    ScreenGui.Parent = game.CoreGui
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Position = getgenv().Config.GUIPosition
-    MainFrame.Size = UDim2.new(0, 220, 0, 300)
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-    
-    UICorner.CornerRadius = UDim.new(0, 10)
-    UICorner.Parent = MainFrame
-    
-    Title.Parent = MainFrame
-    Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    Title.BorderSizePixel = 0
-    Title.Size = UDim2.new(1, 0, 0, 45)
-    Title.Font = Enum.Font.GothamBold
-    Title.Text = "🎮 Train to Fight"
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 16
-    
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10)
-    TitleCorner.Parent = Title
-    
-    Container.Parent = MainFrame
-    Container.BackgroundTransparency = 1
-    Container.Position = UDim2.new(0, 10, 0, 55)
-    Container.Size = UDim2.new(1, -20, 1, -65)
-    
-    UIListLayout.Parent = Container
-    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Padding = UDim.new(0, 8)
-    
-    local function CreateButton(text, color, callback)
-        local Button = Instance.new("TextButton")
-        local BtnCorner = Instance.new("UICorner")
-        
-        Button.Parent = Container
-        Button.BackgroundColor3 = color
-        Button.BorderSizePixel = 0
-        Button.Size = UDim2.new(1, 0, 0, 40)
-        Button.Font = Enum.Font.GothamBold
-        Button.Text = text
-        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Button.TextSize = 13
-        Button.MouseButton1Click:Connect(callback)
-        
-        BtnCorner.CornerRadius = UDim.new(0, 8)
-        BtnCorner.Parent = Button
-        
-        return Button
-    end
-    
-    -- Buttons
-    local MultiplyBtn = CreateButton("💪 Multiply Stats", Color3.fromRGB(0, 180, 0), MultiplyStats)
-    
-    local AutoTrainBtn = CreateButton(
-        "🏋️ Auto Train: " .. (getgenv().Config.AutoTrain and "ON" or "OFF"),
-        getgenv().Config.AutoTrain and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(180, 0, 0),
-        function()
-            getgenv().Config.AutoTrain = not getgenv().Config.AutoTrain
-            AutoTrainBtn.Text = "🏋️ Auto Train: " .. (getgenv().Config.AutoTrain and "ON" or "OFF")
-            AutoTrainBtn.BackgroundColor3 = getgenv().Config.AutoTrain and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(180, 0, 0)
+        if success then
+            wait(0.5)
+            local newValue = testStat.Value
+            print(string.format("  New value: %s", tostring(newValue)))
             
-            if getgenv().Config.AutoTrain then
-                AutoTrain()
+            if newValue == originalValue + 100 then
+                print("✅ Modification SUCCESS!")
+                -- Restore original value
+                testStat.Value = originalValue
+                print("  (Value restored)")
             else
-                AutoTrainRunning = false
+                print("⚠️ Value changed but not as expected!")
+                print(string.format("  Expected: %s, Got: %s", originalValue + 100, newValue))
             end
+        else
+            print("❌ Modification FAILED!")
+            print("  Error:", err)
         end
-    )
-    
-    local SpeedBtn = CreateButton("⚡ Apply Speed", Color3.fromRGB(0, 120, 215), ApplyCharacterBoost)
-    
-    local CloseBtn = CreateButton("❌ Close", Color3.fromRGB(180, 0, 0), function()
-        ScreenGui:Destroy()
-        getgenv().Config.AutoTrain = false
-        Notify("GUI", "Closed", 2)
-    end)
+    else
+        print("❌ Arms stat not found for testing")
+    end
 end
 
--- ═══════════════════════════════════════════════════════════
--- 🚀 AUTO INITIALIZATION
--- ═══════════════════════════════════════════════════════════
+-- 5. CHECK REMOTES
+print("\n📡 5. CHECKING REMOTES:")
+local remoteCount = 0
+for _, remote in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+    if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+        remoteCount = remoteCount + 1
+        if remote.Name:lower():find("train") or 
+           remote.Name:lower():find("stat") or
+           remote.Name:lower():find("workout") then
+            print(string.format("  📍 %s (%s)", remote.Name, remote:GetFullName()))
+        end
+    end
+end
+print(string.format("Total remotes found: %d", remoteCount))
 
-wait(1)
+-- 6. SECURITY CHECK
+print("\n🛡️ 6. SECURITY CHECKS:")
+local tests = {
+    {name = "Can modify WalkSpeed", test = function()
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            local h = Player.Character.Humanoid
+            local old = h.WalkSpeed
+            h.WalkSpeed = 100
+            local result = h.WalkSpeed == 100
+            h.WalkSpeed = old
+            return result
+        end
+        return false
+    end},
+    {name = "ReplicatedStorage accessible", test = function()
+        return game:GetService("ReplicatedStorage") ~= nil
+    end},
+    {name = "Can use getgenv()", test = function()
+        return getgenv ~= nil
+    end}
+}
 
--- Apply speed on spawn
-if getgenv().Config.AutoApplySpeed then
-    ApplyCharacterBoost()
-    Player.CharacterAdded:Connect(function()
-        wait(1)
-        ApplyCharacterBoost()
-    end)
+for _, test in ipairs(tests) do
+    local success, result = pcall(test.test)
+    local status = (success and result) and "✅ PASS" or "❌ FAIL"
+    print(string.format("  %s - %s", status, test.name))
 end
 
--- Start auto train
-if getgenv().Config.AutoTrain then
-    AutoTrain()
-end
+print("\n" .. string.rep("=", 60))
+print("📋 DIAGNOSTIC COMPLETE")
+print(string.rep("=", 60))
+print("\n💡 INSTRUCTIONS:")
+print("1. Take a screenshot of this output")
+print("2. Share it so I can see the exact structure")
+print("3. Or copy-paste the 'LEADERSTATS DETAILED CHECK' section")
+print(string.rep("=", 60) .. "\n")
 
-Notify("Train to Fight", "Script loaded! ✓", 5)
-
-print([[
-═══════════════════════════════════════════════════════════
-    TRAIN TO FIGHT MOD - LOADED
-    
-    • Multiply Stats: Click button atau panggil MultiplyStats()
-    • Auto Train: Toggle di GUI
-    • Speed Boost: Applied automatically
-    
-    Edit Config di baris 21-48 untuk customize!
-═══════════════════════════════════════════════════════════
-]])
+-- Notification
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Diagnostic Complete",
+    Text = "Check console (F9) for results!",
+    Duration = 5
+})
