@@ -26,13 +26,13 @@ local Player = Players.LocalPlayer
 
 getgenv().Config = getgenv().Config or {
     -- MULTIPLIER STATS
-    ArmsMultiplier = 10,        -- Multiply Arms
-    BackMultiplier = 10,        -- Multiply Back
-    LegsMultiplier = 10,        -- Multiply Legs
-    AgilityMultiplier = 10,     -- Multiply Agility
+    ArmsMultiplier = 40,        -- Multiply Arms
+    BackMultiplier = 40,        -- Multiply Back
+    LegsMultiplier = 40,        -- Multiply Legs
+    AgilityMultiplier = 40,     -- Multiply Agility
     
     -- AUTO TRAINING
-    AutoTrain = true,           -- Auto training on/off
+    AutoTrain = false,           -- Auto training on/off
     TrainDelay = 0.3,          -- Delay antar training (seconds)
     TrainBodyParts = {         -- Body parts yang mau di-train
         "Arms",
