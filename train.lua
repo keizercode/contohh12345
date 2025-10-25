@@ -1,183 +1,220 @@
---[[
-═══════════════════════════════════════════════════════════
-    TRAIN TO FIGHT - DIAGNOSTIC SCRIPT
-    Jalankan ini untuk cek struktur stats
-═══════════════════════════════════════════════════════════
-]]
+-- Train to Fight - Stats Multiply Mod
+-- Modified training script with customizable multipliers
 
 local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
 
-print("\n" .. string.rep("=", 60))
-print("🔍 TRAIN TO FIGHT - DIAGNOSTIC MODE")
-print(string.rep("=", 60))
-
--- Function untuk print tree structure
-local function printTree(instance, indent)
-    indent = indent or ""
-    for _, child in pairs(instance:GetChildren()) do
-        local info = child.Name .. " (" .. child.ClassName .. ")"
-        if child:IsA("ValueBase") then
-            info = info .. " = " .. tostring(child.Value)
-        end
-        print(indent .. "├─ " .. info)
-        
-        if #child:GetChildren() > 0 and not child:IsA("ValueBase") then
-            printTree(child, indent .. "│  ")
-        end
-    end
-end
-
-wait(2) -- Wait for game to load
-
--- 1. CHECK PLAYER STRUCTURE
-print("\n📂 1. PLAYER STRUCTURE:")
-print("Player Name:", Player.Name)
-printTree(Player, "")
-
--- 2. CHECK CHARACTER STRUCTURE
-print("\n👤 2. CHARACTER STRUCTURE:")
-if Player.Character then
-    printTree(Player.Character, "")
-else
-    print("❌ Character not found!")
-end
-
--- 3. SPECIFIC LEADERSTATS CHECK
-print("\n📊 3. LEADERSTATS DETAILED CHECK:")
-local leaderstats = Player:FindFirstChild("leaderstats")
-if leaderstats then
-    print("✅ Leaderstats FOUND at:", leaderstats:GetFullName())
-    print("\nStats inside leaderstats:")
-    for _, stat in pairs(leaderstats:GetChildren()) do
-        local statInfo = {
-            Name = stat.Name,
-            ClassName = stat.ClassName,
-            Value = stat:IsA("ValueBase") and stat.Value or "N/A",
-            Parent = stat.Parent.Name,
-            FullPath = stat:GetFullName()
-        }
-        print(string.format("  • %s", stat.Name))
-        print(string.format("    - Type: %s", statInfo.ClassName))
-        print(string.format("    - Current Value: %s", tostring(statInfo.Value)))
-        print(string.format("    - Full Path: %s", statInfo.FullPath))
-        print(string.format("    - Can be modified: %s", stat.Value ~= nil and "YES" or "NO"))
-    end
-else
-    print("❌ Leaderstats NOT FOUND!")
-    print("\nSearching in other locations...")
-    
-    local possibleLocations = {
-        Player.PlayerGui,
-        Player.PlayerScripts,
-        Player.Backpack,
-        Player.Character
-    }
-    
-    for _, location in pairs(possibleLocations) do
-        if location then
-            local found = location:FindFirstChild("leaderstats") or location:FindFirstChild("Stats")
-            if found then
-                print("✅ Found stats at:", found:GetFullName())
-            end
-        end
-    end
-end
-
--- 4. TEST MODIFICATION
-print("\n🔧 4. TESTING STAT MODIFICATION:")
-if leaderstats then
-    local testStat = leaderstats:FindFirstChild("Arms")
-    if testStat then
-        local originalValue = testStat.Value
-        print(string.format("Testing Arms modification..."))
-        print(string.format("  Original value: %s", tostring(originalValue)))
-        
-        wait(0.5)
-        
-        -- Try to modify
-        local success, err = pcall(function()
-            testStat.Value = originalValue + 100
-        end)
-        
-        if success then
-            wait(0.5)
-            local newValue = testStat.Value
-            print(string.format("  New value: %s", tostring(newValue)))
-            
-            if newValue == originalValue + 100 then
-                print("✅ Modification SUCCESS!")
-                -- Restore original value
-                testStat.Value = originalValue
-                print("  (Value restored)")
-            else
-                print("⚠️ Value changed but not as expected!")
-                print(string.format("  Expected: %s, Got: %s", originalValue + 100, newValue))
-            end
-        else
-            print("❌ Modification FAILED!")
-            print("  Error:", err)
-        end
-    else
-        print("❌ Arms stat not found for testing")
-    end
-end
-
--- 5. CHECK REMOTES
-print("\n📡 5. CHECKING REMOTES:")
-local remoteCount = 0
-for _, remote in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
-    if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-        remoteCount = remoteCount + 1
-        if remote.Name:lower():find("train") or 
-           remote.Name:lower():find("stat") or
-           remote.Name:lower():find("workout") then
-            print(string.format("  📍 %s (%s)", remote.Name, remote:GetFullName()))
-        end
-    end
-end
-print(string.format("Total remotes found: %d", remoteCount))
-
--- 6. SECURITY CHECK
-print("\n🛡️ 6. SECURITY CHECKS:")
-local tests = {
-    {name = "Can modify WalkSpeed", test = function()
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            local h = Player.Character.Humanoid
-            local old = h.WalkSpeed
-            h.WalkSpeed = 100
-            local result = h.WalkSpeed == 100
-            h.WalkSpeed = old
-            return result
-        end
-        return false
-    end},
-    {name = "ReplicatedStorage accessible", test = function()
-        return game:GetService("ReplicatedStorage") ~= nil
-    end},
-    {name = "Can use getgenv()", test = function()
-        return getgenv ~= nil
-    end}
+-- Configuration
+local Config = {
+    Multipliers = {
+        Arms = 40,      -- Multiply untuk Arms training
+        Legs = 40,      -- Multiply untuk Legs training
+        Back = 40,      -- Multiply untuk Back training
+        Agility = 40    -- Multiply untuk Agility training
+    },
+    AutoTrain = {
+        Arms = false,
+        Legs = false,
+        Back = false,
+        Agility = false
+    },
+    TrainDelay = 0.1  -- Delay antar training (detik)
 }
 
-for _, test in ipairs(tests) do
-    local success, result = pcall(test.test)
-    local status = (success and result) and "✅ PASS" or "❌ FAIL"
-    print(string.format("  %s - %s", status, test.name))
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TrainMultiplyGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 350, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Title.Text = "Train Multiply Mod"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Function untuk membuat section
+local function CreateSection(name, yPos)
+    local Section = Instance.new("Frame")
+    Section.Size = UDim2.new(0.9, 0, 0, 70)
+    Section.Position = UDim2.new(0.05, 0, 0, yPos)
+    Section.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    Section.BorderSizePixel = 0
+    Section.Parent = MainFrame
+    
+    local SectionCorner = Instance.new("UICorner")
+    SectionCorner.CornerRadius = UDim.new(0, 8)
+    SectionCorner.Parent = Section
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.4, 0, 0, 30)
+    Label.Position = UDim2.new(0.05, 0, 0, 5)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 14
+    Label.Font = Enum.Font.GothamBold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Section
+    
+    local MultiplierBox = Instance.new("TextBox")
+    MultiplierBox.Size = UDim2.new(0.25, 0, 0, 25)
+    MultiplierBox.Position = UDim2.new(0.05, 0, 0.5, 0)
+    MultiplierBox.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    MultiplierBox.Text = tostring(Config.Multipliers[name])
+    MultiplierBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MultiplierBox.TextSize = 12
+    MultiplierBox.Font = Enum.Font.Gotham
+    MultiplierBox.PlaceholderText = "x40"
+    MultiplierBox.Parent = Section
+    
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 5)
+    BoxCorner.Parent = MultiplierBox
+    
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Size = UDim2.new(0.35, 0, 0, 25)
+    ToggleButton.Position = UDim2.new(0.35, 0, 0.5, 0)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    ToggleButton.Text = "OFF"
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.TextSize = 12
+    ToggleButton.Font = Enum.Font.GothamBold
+    ToggleButton.Parent = Section
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 5)
+    ButtonCorner.Parent = ToggleButton
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Size = UDim2.new(0.2, 0, 0, 25)
+    StatusLabel.Position = UDim2.new(0.75, 0, 0.5, 0)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Text = "0"
+    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    StatusLabel.TextSize = 14
+    StatusLabel.Font = Enum.Font.GothamBold
+    StatusLabel.Parent = Section
+    
+    -- Update multiplier saat text berubah
+    MultiplierBox.FocusLost:Connect(function()
+        local value = tonumber(MultiplierBox.Text)
+        if value and value > 0 then
+            Config.Multipliers[name] = value
+        else
+            MultiplierBox.Text = tostring(Config.Multipliers[name])
+        end
+    end)
+    
+    -- Toggle button
+    ToggleButton.MouseButton1Click:Connect(function()
+        Config.AutoTrain[name] = not Config.AutoTrain[name]
+        if Config.AutoTrain[name] then
+            ToggleButton.Text = "ON"
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 220, 50)
+        else
+            ToggleButton.Text = "OFF"
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+        end
+    end)
+    
+    return StatusLabel
 end
 
-print("\n" .. string.rep("=", 60))
-print("📋 DIAGNOSTIC COMPLETE")
-print(string.rep("=", 60))
-print("\n💡 INSTRUCTIONS:")
-print("1. Take a screenshot of this output")
-print("2. Share it so I can see the exact structure")
-print("3. Or copy-paste the 'LEADERSTATS DETAILED CHECK' section")
-print(string.rep("=", 60) .. "\n")
+-- Buat sections untuk setiap stat
+local StatusLabels = {
+    Arms = CreateSection("Arms", 50),
+    Legs = CreateSection("Legs", 130),
+    Back = CreateSection("Back", 210),
+    Agility = CreateSection("Agility", 290)
+}
 
--- Notification
-game.StarterGui:SetCore("SendNotification", {
-    Title = "Diagnostic Complete",
-    Text = "Check console (F9) for results!",
-    Duration = 5
-})
+-- Close button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0.9, 0, 0, 35)
+CloseButton.Position = UDim2.new(0.05, 0, 0, 405)
+CloseButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+CloseButton.Text = "Close GUI"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = MainFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Training functions
+local TrainCounts = {Arms = 0, Legs = 0, Back = 0, Agility = 0}
+
+local function TrainStat(statName)
+    local multiplier = Config.Multipliers[statName]
+    
+    -- Cari remote event yang sesuai berdasarkan screenshot
+    local success, err = pcall(function()
+        for i = 1, multiplier do
+            -- Sesuaikan dengan remote yang ada di game
+            -- Contoh remote calls berdasarkan pola di screenshot
+            if statName == "Arms" then
+                ReplicatedStorage.TrainEquipment.Remote.ApplyMobileTrain:FireServer("Arms")
+            elseif statName == "Legs" then
+                ReplicatedStorage.TrainEquipment.Remote.ApplyMobileTrain:FireServer("Legs")
+            elseif statName == "Back" then
+                ReplicatedStorage.TrainEquipment.Remote.ApplyMobileTrain:FireServer("Back")
+            elseif statName == "Agility" then
+                ReplicatedStorage.TrainEquipment.Remote.ApplyMobileTrain:FireServer("Agility")
+            end
+            
+            TrainCounts[statName] = TrainCounts[statName] + 1
+            StatusLabels[statName].Text = tostring(TrainCounts[statName])
+            
+            wait(0.01) -- Small delay antar request
+        end
+    end)
+    
+    if not success then
+        warn("Training error:", err)
+    end
+end
+
+-- Main training loop
+spawn(function()
+    while wait(Config.TrainDelay) do
+        for statName, enabled in pairs(Config.AutoTrain) do
+            if enabled then
+                TrainStat(statName)
+            end
+        end
+    end
+end)
+
+-- Info
+print("Train Multiply Mod loaded!")
+print("Multiply: Arms x" .. Config.Multipliers.Arms)
+print("Contoh: Train +18 dengan multiply x40 = 720 per klik")
