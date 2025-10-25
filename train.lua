@@ -42,7 +42,7 @@ getgenv().Config = getgenv().Config or {
     },
     
     -- CHARACTER BOOST
-    WalkSpeed = 100,            -- Default: 16
+    WalkSpeed = 300,            -- Default: 16
     JumpPower = 100,            -- Default: 50
     AutoApplySpeed = true,      -- Auto apply speed setiap spawn
     
